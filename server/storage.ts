@@ -1,6 +1,4 @@
 import { snippets, type Snippet, type InsertSnippet } from "@shared/schema";
-import { db } from "./db";
-import { eq, desc, or, like, sql } from "drizzle-orm";
 
 export interface IStorage {
   getSnippets(): Promise<Snippet[]>;
@@ -13,70 +11,206 @@ export interface IStorage {
   toggleFavorite(id: number): Promise<Snippet | undefined>;
 }
 
-export class DatabaseStorage implements IStorage {
+export class MemStorage implements IStorage {
+  private snippets: Map<number, Snippet>;
+  private currentId: number;
+
+  constructor() {
+    this.snippets = new Map();
+    this.currentId = 1;
+    this.seedData();
+  }
+
+  private seedData() {
+    const sampleSnippets: InsertSnippet[] = [
+      {
+        title: "Debounce Function",
+        description: "Utility function for debouncing API calls",
+        code: `function debounce(func, wait) {
+  let timeout;
+  return function executedFunction(...args) {
+    const later = () => {
+      clearTimeout(timeout);
+      func(...args);
+    };
+    clearTimeout(timeout);
+    timeout = setTimeout(later, wait);
+  };
+}`,
+        language: "javascript",
+        isPublic: true,
+      },
+      {
+        title: "Custom Hook - useLocalStorage",
+        description: "React hook for localStorage management",
+        code: `import { useState, useEffect } from 'react';
+
+export function useLocalStorage(key, initialValue) {
+  const [storedValue, setStoredValue] = useState(() => {
+    try {
+      const item = window.localStorage.getItem(key);
+      return item ? JSON.parse(item) : initialValue;
+    } catch (error) {
+      return initialValue;
+    }
+  });
+
+  const setValue = (value) => {
+    try {
+      setStoredValue(value);
+      window.localStorage.setItem(key, JSON.stringify(value));
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  return [storedValue, setValue];
+}`,
+        language: "react",
+        isPublic: true,
+      },
+      {
+        title: "CSS Grid Layout",
+        description: "Responsive card grid with auto-fit",
+        code: `.grid-container {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 2rem;
+  padding: 2rem;
+}
+
+.grid-item {
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}`,
+        language: "css",
+        isPublic: false,
+      },
+      {
+        title: "API Error Handler",
+        description: "Centralized error handling for API requests",
+        code: `import requests
+from typing import Optional, Dict, Any
+
+class APIErrorHandler:
+    def handle_response(self, response: requests.Response) -> Optional[Dict[str, Any]]:
+        if response.status_code == 200:
+            return response.json()
+        elif response.status_code == 404:
+            print("Resource not found")
+        else:
+            print(f"Error: {response.status_code}")
+            return None`,
+        language: "python",
+        isPublic: true,
+      },
+      {
+        title: "Async/Await Wrapper",
+        description: "Clean error handling for async operations",
+        code: `const asyncWrapper = (fn) => {
+  return async (...args) => {
+    try {
+      return await fn(...args);
+    } catch (error) {
+      console.error('Error in async operation:', error);
+      throw error;
+    }
+  };
+};
+
+// Usage
+const fetchData = asyncWrapper(async (url) => {
+  const response = await fetch(url);
+  return response.json();
+});`,
+        language: "javascript",
+        isPublic: true,
+      },
+      {
+        title: "Flexbox Center Everything",
+        description: "Perfect centering with flexbox",
+        code: `.center-everything {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+}
+
+.centered-content {
+  text-align: center;
+  max-width: 600px;
+  padding: 2rem;
+}`,
+        language: "css",
+        isPublic: true,
+      }
+    ];
+
+    sampleSnippets.forEach(snippet => {
+      this.createSnippet(snippet);
+    });
+  }
+
   async getSnippets(): Promise<Snippet[]> {
-    return await db.select().from(snippets).orderBy(desc(snippets.createdAt));
+    return Array.from(this.snippets.values()).sort((a, b) => 
+      new Date(b.createdAt!).getTime() - new Date(a.createdAt!).getTime()
+    );
   }
 
   async getSnippet(id: number): Promise<Snippet | undefined> {
-    const [snippet] = await db.select().from(snippets).where(eq(snippets.id, id));
-    return snippet || undefined;
+    return this.snippets.get(id);
   }
 
   async createSnippet(insertSnippet: InsertSnippet): Promise<Snippet> {
-    const [snippet] = await db
-      .insert(snippets)
-      .values(insertSnippet)
-      .returning();
+    const id = this.currentId++;
+    const snippet: Snippet = {
+      ...insertSnippet,
+      id,
+      favorites: 0,
+      createdAt: new Date(),
+    };
+    this.snippets.set(id, snippet);
     return snippet;
   }
 
   async updateSnippet(id: number, updateData: Partial<InsertSnippet>): Promise<Snippet | undefined> {
-    const [snippet] = await db
-      .update(snippets)
-      .set(updateData)
-      .where(eq(snippets.id, id))
-      .returning();
-    return snippet || undefined;
+    const snippet = this.snippets.get(id);
+    if (!snippet) return undefined;
+
+    const updatedSnippet = { ...snippet, ...updateData };
+    this.snippets.set(id, updatedSnippet);
+    return updatedSnippet;
   }
 
   async deleteSnippet(id: number): Promise<boolean> {
-    const result = await db.delete(snippets).where(eq(snippets.id, id));
-    return result.rowCount! > 0;
+    return this.snippets.delete(id);
   }
 
   async searchSnippets(query: string): Promise<Snippet[]> {
-    return await db
-      .select()
-      .from(snippets)
-      .where(
-        or(
-          like(snippets.title, `%${query}%`),
-          like(snippets.description, `%${query}%`),
-          like(snippets.code, `%${query}%`)
-        )
-      )
-      .orderBy(desc(snippets.createdAt));
+    const allSnippets = await this.getSnippets();
+    const lowerQuery = query.toLowerCase();
+    
+    return allSnippets.filter(snippet =>
+      snippet.title.toLowerCase().includes(lowerQuery) ||
+      snippet.description?.toLowerCase().includes(lowerQuery) ||
+      snippet.code.toLowerCase().includes(lowerQuery)
+    );
   }
 
   async getSnippetsByLanguage(language: string): Promise<Snippet[]> {
-    return await db
-      .select()
-      .from(snippets)
-      .where(eq(snippets.language, language))
-      .orderBy(desc(snippets.createdAt));
+    const allSnippets = await this.getSnippets();
+    return allSnippets.filter(snippet => snippet.language === language);
   }
 
   async toggleFavorite(id: number): Promise<Snippet | undefined> {
-    const [snippet] = await db
-      .update(snippets)
-      .set({
-        favorites: sql`${snippets.favorites} + 1`
-      })
-      .where(eq(snippets.id, id))
-      .returning();
-    return snippet || undefined;
+    const snippet = this.snippets.get(id);
+    if (!snippet) return undefined;
+
+    snippet.favorites = (snippet.favorites || 0) + 1;
+    this.snippets.set(id, snippet);
+    return snippet;
   }
 }
 
-export const storage = new DatabaseStorage();
+export const storage = new MemStorage();
