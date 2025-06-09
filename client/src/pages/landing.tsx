@@ -21,6 +21,15 @@ export default function Landing() {
             </div>
             
             <div className="flex items-center space-x-4">
+              <nav className="hidden md:flex space-x-6">
+                <Link href="/portfolio">
+                  <a className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors">Portfolio</a>
+                </Link>
+                <Link href="/app">
+                  <a className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors">CodeVault</a>
+                </Link>
+              </nav>
+              
               <Button
                 variant="ghost"
                 size="icon"
@@ -29,12 +38,6 @@ export default function Landing() {
               >
                 {theme === "dark" ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
               </Button>
-              
-              <Link href="/app">
-                <Button variant="ghost" className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white">
-                  Sign In
-                </Button>
-              </Link>
             </div>
           </div>
         </div>
