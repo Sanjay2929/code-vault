@@ -4,12 +4,12 @@ import { storage } from "./storage";
 import { insertSnippetSchema } from "@shared/schema";
 import { z } from "zod";
 
-export async function registerRoutes(app: Express): Promise<Server> {
+export function registerRoutes(app: Express) {
   // Get all snippets
   app.get("/api/snippets", async (req, res) => {
     try {
       const { search, language } = req.query;
-      
+
       let snippets;
       if (search) {
         snippets = await storage.searchSnippets(search as string);
@@ -18,7 +18,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       } else {
         snippets = await storage.getSnippets();
       }
-      
+
       res.json(snippets);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch snippets" });
@@ -30,11 +30,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const id = parseInt(req.params.id);
       const snippet = await storage.getSnippet(id);
-      
+
       if (!snippet) {
         return res.status(404).json({ message: "Snippet not found" });
       }
-      
+
       res.json(snippet);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch snippet" });
@@ -49,7 +49,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(201).json(snippet);
     } catch (error) {
       if (error instanceof z.ZodError) {
-        return res.status(400).json({ message: "Invalid snippet data", errors: error.errors });
+        return res
+          .status(400)
+          .json({ message: "Invalid snippet data", errors: error.errors });
       }
       res.status(500).json({ message: "Failed to create snippet" });
     }
@@ -60,13 +62,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const id = parseInt(req.params.id);
       const updateData = req.body;
-      
+
       const snippet = await storage.updateSnippet(id, updateData);
-      
+
       if (!snippet) {
         return res.status(404).json({ message: "Snippet not found" });
       }
-      
+
       res.json(snippet);
     } catch (error) {
       res.status(500).json({ message: "Failed to update snippet" });
@@ -78,11 +80,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const id = parseInt(req.params.id);
       const deleted = await storage.deleteSnippet(id);
-      
+
       if (!deleted) {
         return res.status(404).json({ message: "Snippet not found" });
       }
-      
+
       res.status(204).send();
     } catch (error) {
       res.status(500).json({ message: "Failed to delete snippet" });
@@ -94,11 +96,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const id = parseInt(req.params.id);
       const snippet = await storage.toggleFavorite(id);
-      
+
       if (!snippet) {
         return res.status(404).json({ message: "Snippet not found" });
       }
-      
+
       res.json(snippet);
     } catch (error) {
       res.status(500).json({ message: "Failed to toggle favorite" });
@@ -113,7 +115,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         acc[snippet.language] = (acc[snippet.language] || 0) + 1;
         return acc;
       }, {} as Record<string, number>);
-      
+
       res.json(stats);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch language stats" });
